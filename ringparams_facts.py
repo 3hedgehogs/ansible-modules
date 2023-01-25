@@ -14,7 +14,7 @@ module: ringparams_facts
 short_description: Return C(Query) RX/TX ring parameters of network interfaces information as fact data
 description:
      - Return Query RX/TX ring parameters for network interfaces if such informatio available.
-version_added: "1.0"
+version_added: "1.1"
 requirements: ["Installed ethtool package"]
 options:
   interfaces:
@@ -98,12 +98,31 @@ ansible_facts:
 '''
 
 import os
-import platform
-import re
 import shutil
 from shlex import quote
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.common.locale import get_best_parsable_locale
+
+
+def get_interfaces(module):
+    ''' Return list of network interfaces excluding lo '''
+
+    list_interfaces = []
+    if os.path.isfile('/proc/net/dev'):
+        rc, stdout, stderr = module.run_command(
+            "/usr/bin/cat /proc/net/dev | /usr/bin/tail -n +3 | /usr/bin/awk -F: '{ print $1 }'",
+            use_unsafe_shell=True
+        )
+        if rc == 0:
+            for line in stdout.strip().splitlines():
+                intf = line.strip()
+                if intf != 'lo':
+                    list_interfaces.append(intf)
+        else:
+            stderr = stderr.replace("\n", ".")
+            module.warn(f'Unable to fetch list of network interfaces: {stderr}')
+
+    return list_interfaces
 
 
 def main():
@@ -117,9 +136,9 @@ def main():
     locale = get_best_parsable_locale(module)
     module.run_command_environ_update = dict(LANG=locale, LC_ALL=locale)
     list_interfaces = module.params['interfaces']
-    result = dict()
+    result = {}
     result['network_interfaces'] = list_interfaces
-    values = dict()
+    values = {}
     ringparams = []
 
     exe = shutil.which('ethtool')
@@ -128,19 +147,7 @@ def main():
 
     # If list is empty = will try to find all interfaces except 'lo'
     if not list_interfaces:
-        if os.path.isfile('/proc/net/dev'):
-            rc, stdout, stderr = module.run_command(
-                "/usr/bin/cat /proc/net/dev | /usr/bin/tail -n +3 | /usr/bin/awk -F: '{ print $1 }'",
-                use_unsafe_shell=True
-            )
-            if rc == 0:
-                for line in stdout.strip().splitlines():
-                    intf = line.strip()
-                    if intf != 'lo':
-                        list_interfaces.append(intf)
-            else:
-                stderr = stderr.replace("\n", ".")
-                module.warn(f'Unable to fetch list of network interfaces: {stderr}')
+        list_interfaces = get_interfaces(module)
 
     for interface in list_interfaces:
         values[interface] = {}
@@ -190,6 +197,7 @@ def main():
 
     results = dict(ansible_facts=dict(ringparams=ringparams))
     module.exit_json(**results)
+
 
 if __name__ == '__main__':
     main()
