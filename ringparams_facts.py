@@ -14,7 +14,7 @@ module: ringparams_facts
 short_description: Return C(Query) RX/TX ring parameters of network interfaces information as fact data
 description:
      - Return Query RX/TX ring parameters for network interfaces if such informatio available.
-version_added: "1.1"
+version_added: "2.14.0"
 requirements: ["Installed ethtool package"]
 options:
   interfaces:
@@ -26,7 +26,7 @@ options:
       - Network interface names
     aliases: [name]
 author:
-  - Sergey Polyakov (sergey.polyakov@mapp.com)
+  - Sergey Polyakov (@3hedgehogs)
 '''
 
 EXAMPLES = r'''
